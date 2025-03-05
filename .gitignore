@@ -4,3 +4,71 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Ignore all video files
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+*.webm
+*.m4v
+
+# Ignore all image files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.tif
+*.webp
+*.heic
+*.svg
+
+# Ignore all RAW image formats (used in photography)
+*.raw
+*.arw
+*.cr2
+*.nef
+*.orf
+*.sr2
+
+# Ignore large archives and compressed files
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+*.bz2
+
+# Ignore disk images and installers
+*.iso
+*.dmg
+*.exe
+*.msi
+
+# Ignore large design & media files
+*.psd  # Photoshop
+*.ai   # Adobe Illustrator
+*.eps  # Vector images
+*.indd # InDesign files
+*.fla  # Adobe Flash
+*.swf  # Flash files
+*.blend # Blender 3D files
+
+# Ignore database and backup files
+*.sql
+*.sqlite
+*.bak
+*.db
+*.mdb
+*.ldf
+
+# Ignore temporary & cache files
+*.tmp
+*.log
+*.cache
+.DS_Store
+Thumbs.db
