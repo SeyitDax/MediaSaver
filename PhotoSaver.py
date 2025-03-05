@@ -2,34 +2,70 @@ import os
 import tkinter as tk
 import shutil
 import hashlib
+import imagehash
 from tkinter import filedialog, messagebox
 from pathlib import Path
+from PIL import Image
 
 # Supported file formats
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".heic"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".wmv"}
 
 def get_file_hash(file_path):
-    """Generate a hash for a given file using SHA-256."""
-    hash_algo = hashlib.sha256() # Create a hash object
-    with open(file_path, "rb") as f: # Read the file in binary mode
-        while chunk := f.read(4096):
-            hash_algo.update(chunk) # Update hash with file data
-    return hash_algo.hexdigest() # Return hash as a hex string
+    """Generate a hash for a given file.
+    - Uses perceptual hashing for images
+    - Uses SHA-256 for videos & other files
+    """
+    try:
+        # if the file is an image, use perceptual hashing
+        if file_path.suffix.lower() in IMAGE_EXTENSIONS:
+            with Image.open(file_path) as img:
+                img_hash = imagehash.average_hash(img, hash_size=8)
+                return img_hash # Convert hash to string
+        else:
+            # For non images (videos, documents), use standard SHA-256 hashing
+            hash_algo = hashlib.sha256() # Create a hash object
+            with open(file_path, "rb") as f: # Read the file in binary mode
+                while chunk := f.read(4096):
+                    hash_algo.update(chunk) # Update hash with file data
+            return hash_algo.hexdigest() # Return hash as a hex string
+    except Exception as e:
+        print(f"Error hashing file {file_path}: {e}")
+        return None
 
-def find_dublicates(file_list):
-    """Find duplicate files by comparing their hashes."""
+def find_dublicates(file_list, similarity_threshold=5):
+    """Find duplicate images/videos by comparing their hashes.
+       - Exact matches for videos/documents
+       - Near-matches (threshold) for images 
+    """
     hash_dict = {} # Stores hash → file path
     duplicates = [] # Stores duplicate file paths
 
     for file in file_list:
         file_hash = get_file_hash(file)
+        if not file_hash:
+            continue # Skip files that couldn't be hashed
 
-        if file_hash in hash_dict:
-            duplicates.append(file) # Found a duplicate
-        else:
-            hash_dict[file_hash] = file # Store hash
+        found_duplicate = False
+
+        for existing_hash, existing_file in hash_dict.items():
+            # For images, check similarity instead of exact match
+            if file.suffix.lower() in IMAGE_EXTENSIONS and isinstance(file_hash, imagehash.ImageHash):
+                # -Handle images separately
+                if isinstance(existing_hash, imagehash.ImageHash):
+                    if abs(file_hash - existing_hash) <= similarity_threshold:
+                        duplicates.append(file)
+                        found_duplicate = True
+                        break # Stop checking once we find a near-duplicate
+            elif isinstance(file_hash, str) and isinstance(existing_hash, str): # Ensure bıth are string hashes
+                if file_hash == existing_hash:
+                    duplicates.append(file)
+                    found_duplicate = True
+                    break
         
+        if not found_duplicate:
+            hash_dict[file_hash] = file # Store only unique hashes
+    
     return duplicates
 
 def select_folders():
@@ -70,7 +106,7 @@ def categorize_files(files):
     images = [f for f in files if f.suffix.lower() in IMAGE_EXTENSIONS]
     videos = [f for f in files if f.suffix.lower() in VIDEO_EXTENSIONS]
     unknown = [f for f in files if f.suffix.lower() not in IMAGE_EXTENSIONS | VIDEO_EXTENSIONS]
-    return images, videos, unknown
+    return {"Images": images, "Videos": videos, "Unknown": unknown}
 
 def get_user_choice(prompt, valid_options):
     """Prompt the user for input until a valid response is given."""
@@ -126,7 +162,7 @@ def organize_files():
 
     # Find duplicates first and move them
     if remove_duplicates:
-        duplicates = find_dublicates(all_files) # Get duplicate files
+        duplicates = find_dublicates(all_files, similarity_threshold=5) # Get duplicate files
         if duplicates:
             move_files(duplicates, merged_folder / "Duplicates", False, True) # Move duplicates to a separate folder
             all_files = [file for file in all_files if file not in duplicates] # Remove duplicates from processing list
