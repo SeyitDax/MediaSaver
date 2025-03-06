@@ -6,10 +6,32 @@ import imagehash
 from tkinter import filedialog, messagebox
 from pathlib import Path
 from PIL import Image
+from tkinterdnd2 import DND_FILES, TkinterDnD
 
 # Supported file formats
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".heic"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".wmv"}
+
+def select_folders():
+    """Allow user to select multiple folders one by one."""
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    root.update()  # Ensure Tkinter loads
+    
+    selected_folders = []  # Store multiple folder paths
+    
+    while True:
+        folder = filedialog.askdirectory(title="Select a folder with photos/videos")
+        if not folder:  # If user cancels selection
+            break
+        selected_folders.append(folder)
+
+        # Ask if they want to add another folder
+        if not messagebox.askyesno("Select Another?", "Do you want to add another folder?"):
+            break
+    
+    root.destroy()  # Destroy the Tk instance
+    return selected_folders if selected_folders else None
 
 def get_file_hash(file_path):
     """Generate a hash for a given file.
@@ -32,6 +54,34 @@ def get_file_hash(file_path):
     except Exception as e:
         print(f"Error hashing file {file_path}: {e}")
         return None
+
+def drag_and_drop():
+    """Create a simple window for drag-and-drop folder selection."""
+    root = TkinterDnD.Tk() # Initialize drag-and-drop capable window
+    
+    root.title("Drag & Drop folders") # Set window title
+    root.geometry("400x200") # Set window size
+
+    folders = []
+
+    def on_drop(event):
+        """Capture dropped files."""
+        dropped_files = root.tk.splitlist(event.data) # Convert dropped files into a list
+        for item in dropped_files:
+            if os.path.isdir(item): # Ensure it's a folder
+                folders.append(item)
+    
+    label = tk.Label(root, text="Drag and Drop Folders Here", font=("Arial", 14), padx=20, pady=20)
+    label.pack(pady=50)
+
+    root.drop_target_register(DND_FILES)
+    root.dnd_bind('<<Drop>>', on_drop)
+
+    print("Drag and drop folders here and press Enter when done.")
+    input() # Wait for user to press Enter
+
+    root.destroy() # Clone Tkinter window
+    return folders if folders else None
 
 def find_dublicates(file_list, similarity_threshold=5):
     """Find duplicate images/videos by comparing their hashes.
@@ -67,27 +117,6 @@ def find_dublicates(file_list, similarity_threshold=5):
             hash_dict[file_hash] = file # Store only unique hashes
     
     return duplicates
-
-def select_folders():
-    """Allow user to select multiple folders one by one."""
-    root = tk.Tk()
-    root.withdraw()  # Hide the main window
-    root.update()  # Ensure Tkinter loads
-    
-    selected_folders = []  # Store multiple folder paths
-    
-    while True:
-        folder = filedialog.askdirectory(title="Select a folder with photos/videos")
-        if not folder:  # If user cancels selection
-            break
-        selected_folders.append(folder)
-
-        # Ask if they want to add another folder
-        if not messagebox.askyesno("Select Another?", "Do you want to add another folder?"):
-            break
-    
-    root.destroy()  # Destroy the Tk instance
-    return selected_folders if selected_folders else None
 
 def list_files(folders):
     """Scan multiple folders and list all photos and videos."""
@@ -139,7 +168,15 @@ def move_files(files, destination_folder, categorize, move):
 def organize_files():
     """Organize selected folders, categorize, and move/copy files into the user-defined folder."""
     print("Select folders to scan for photos and videos.")
-    folders = select_folders()
+
+    # Let the user choose how to select files
+    selection_method = get_user_choice("Select method (1: Manual Slecetion, 2: Drag & Drop): ", {"1","2"})
+
+    if selection_method == "1":
+        folders = select_folders() # Standard selection
+    else:
+        folders = drag_and_drop() # Drag & Drop
+
     if not folders:
         print("No folders selected. Exiting.")
         return
@@ -150,15 +187,19 @@ def organize_files():
         print("No files found in the selected folders.")
         return
 
+    # Let the user choose the Merged Files destination
+    merged_folder_name = filedialog.askdirectory(title="Select Destination for Merged Files")
+    if not merged_folder_name:
+        print("No destination selected. Exiting.")
+        return
+    merged_folder = Path(merged_folder_name)
+
     # Get user preferences
     categorize = get_user_choice("Do you want the files categorized? (Yes/No): ", {"yes", "no", "y", "n"}) in ("yes", "y")
-    merged_folder_name = input("Please enter the name for the main folder: ").strip()
     move = get_user_choice("Do you want the files moved or copied? (Move/Copy): ", {"move", "copy"}) == "move"
     remove_duplicates = get_user_choice("Do you want to remove duplicates? (Yes/No)", {"yes", "no", "y", "n"}) in ("yes", "y")
 
-    # Create the main folder
-    merged_folder = Path.cwd() / merged_folder_name
-    merged_folder.mkdir(exist_ok=True)
+    merged_folder.mkdir(exist_ok=True) # Ensure folder exists
 
     # Find duplicates first and move them
     if remove_duplicates:
