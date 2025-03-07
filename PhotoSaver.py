@@ -60,9 +60,17 @@ def drag_and_drop():
     root = TkinterDnD.Tk() # Initialize drag-and-drop capable window
     
     root.title("Drag & Drop folders") # Set window title
-    root.geometry("400x200") # Set window size
+    root.geometry("400x300") # Set window size
 
     folders = []
+
+    # Add a Label for instructions
+    label = tk.Label(root, text="Drag and Drop Folders Here", font=("Arial", 14), padx=20, pady=20)
+    label.pack(pady=50)
+
+    # Add a Listbox to display dropped items
+    listbox = tk.Listbox(root, width=50, height=10)
+    listbox.pack(pady=10)
 
     def on_drop(event):
         """Capture dropped files."""
@@ -70,10 +78,8 @@ def drag_and_drop():
         for item in dropped_files:
             if os.path.isdir(item): # Ensure it's a folder
                 folders.append(item)
+                listbox.insert(tk.END, item)
     
-    label = tk.Label(root, text="Drag and Drop Folders Here", font=("Arial", 14), padx=20, pady=20)
-    label.pack(pady=50)
-
     root.drop_target_register(DND_FILES)
     root.dnd_bind('<<Drop>>', on_drop)
 
@@ -117,6 +123,25 @@ def find_dublicates(file_list, similarity_threshold=5):
             hash_dict[file_hash] = file # Store only unique hashes
     
     return duplicates
+
+def get_threshold():
+    """Retrieve user-selected similarity threshold from slider."""
+    root = tk.Tk()
+    root.title("Select Similarity Threshold")
+
+    tk.Label(root, text="Adjust the similarity threshold:").pack()
+
+    slider = tk.Scale(root, from_=0, to=15, orient="horizontal", tickinterval=5)
+    slider.pack()
+
+    def submit():
+        global threshold
+        threshold = slider.get()
+        root.destroy()
+    tk.Button(root, text="Confirm", command=submit).pack()
+
+    root.mainloop()
+    return threshold
 
 def list_files(folders):
     """Scan multiple folders and list all photos and videos."""
@@ -203,7 +228,8 @@ def organize_files():
 
     # Find duplicates first and move them
     if remove_duplicates:
-        duplicates = find_dublicates(all_files, similarity_threshold=5) # Get duplicate files
+        user_threshold = get_threshold()
+        duplicates = find_dublicates(all_files, user_threshold) # Get duplicate files
         if duplicates:
             move_files(duplicates, merged_folder / "Duplicates", False, True) # Move duplicates to a separate folder
             all_files = [file for file in all_files if file not in duplicates] # Remove duplicates from processing list
