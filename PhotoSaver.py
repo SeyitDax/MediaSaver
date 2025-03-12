@@ -7,6 +7,7 @@ from tkinter import filedialog, messagebox
 from pathlib import Path
 from PIL import Image
 from tkinterdnd2 import DND_FILES, TkinterDnD
+from tkinter import simpledialog
 
 # Supported file formats
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".heic"}
@@ -58,9 +59,9 @@ def get_file_hash(file_path):
 def drag_and_drop():
     """Create a simple window for drag-and-drop folder selection."""
     root = TkinterDnD.Tk() # Initialize drag-and-drop capable window
-    
+
     root.title("Drag & Drop folders") # Set window title
-    root.geometry("400x300") # Set window size
+    root.geometry("500x500") # Set window size
 
     folders = []
 
@@ -79,14 +80,17 @@ def drag_and_drop():
             if os.path.isdir(item): # Ensure it's a folder
                 folders.append(item)
                 listbox.insert(tk.END, item)
-    
+
     root.drop_target_register(DND_FILES)
     root.dnd_bind('<<Drop>>', on_drop)
 
-    print("Drag and drop folders here and press Enter when done.")
-    input() # Wait for user to press Enter
+    def confirm_selection():
+        """Close the window when the user confirms selection"""
+        root.destroy()
 
-    root.destroy() # Clone Tkinter window
+    tk.Button(root, text="Confirm", command=confirm_selection).pack(pady=10)
+    root.mainloop()
+
     return folders if folders else None
 
 def find_dublicates(file_list, similarity_threshold=5):
@@ -163,10 +167,16 @@ def categorize_files(files):
     return {"Images": images, "Videos": videos, "Unknown": unknown}
 
 def get_user_choice(prompt, valid_options):
-    """Prompt the user for input until a valid response is given."""
-    response = input(prompt).strip().lower()
+    """Prompt the user for input using a GUI dialog box instead of terminal input."""
+    response = simpledialog.askstring("Input Required", prompt) 
+    if response:
+        response = response.strip().lower()
+
     while response not in valid_options:
-        response = input(f"Invalid input. {prompt}").strip().lower()
+        response = simpledialog.askstring("Invalid Input", f"Invalid Input, {prompt}")
+        if response:
+            response = response.strip().lower()
+
     return response
 
 def move_files(files, destination_folder, categorize, move):
@@ -239,6 +249,9 @@ def organize_files():
 
     # Move/Copy files
     move_files(files_to_process, merged_folder, categorize, move)
+
+    messagebox.showinfo("Process Complete", "✅ All files have been organized successfully!")
+
     print("\n✅ Files have been organized!")
     print(f"📂 Merged Folder Location: {merged_folder}")
 
