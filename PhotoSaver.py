@@ -8,6 +8,7 @@ from pathlib import Path
 from PIL import Image
 from tkinterdnd2 import DND_FILES, TkinterDnD
 from tkinter import simpledialog
+from tkinter import ttk
 
 # Supported file formats
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".heic"}
@@ -147,6 +148,21 @@ def get_threshold():
     root.mainloop()
     return threshold
 
+def show_progress_bar(total_files):
+    """Create a progress bar window to track file processing."""
+    progress_root = tk.Tk()
+    progress_root.title("Processing Files...")
+
+    status_label = tk.Label(progress_root, text="Starting...", font=("Arial", 12))
+    status_label.pack(pady=10)
+
+    progress = ttk.Progressbar(progress_root, length=300, mode="determinate")
+    progress.pack(pady=10)
+
+    progress["maximum"] = total_files
+
+    return progress_root, progress, status_label
+
 def list_files(folders):
     """Scan multiple folders and list all photos and videos."""
     all_files = []
@@ -179,12 +195,19 @@ def get_user_choice(prompt, valid_options):
 
     return response
 
-def move_files(files, destination_folder, categorize, move):
+def move_files(files, destination_folder, categorize, move, progress=None):
     """Move files into their repective catorized folders."""
     destination_folder = Path(destination_folder)
 
     if not categorize:
         files = {"All_Files": files} # put everything in a single folder
+
+    if isinstance(files, list):  
+        total_files = len(files)  # If it's a list, just count the items
+    else:
+        total_files = sum(len(file_list) for file_list in files.values())  # If it's a dictionary, count total files
+    
+    processed_files = 0
 
     for category, file_list in files.items():
         category_folder = Path(destination_folder) / category
@@ -199,6 +222,14 @@ def move_files(files, destination_folder, categorize, move):
                     shutil.copy2(file,destination_path) # Copy file
             else:
                 print(f"⚠️ Skipped (already exists): {destination_path}")
+            
+            processed_files += 1
+            if progress:
+                progress["value"] = processed_files
+                progress.update_idletasks()
+    
+    if progress:
+        progress.master.destroy()
                                         
 def organize_files():
     """Organize selected folders, categorize, and move/copy files into the user-defined folder."""
@@ -233,22 +264,36 @@ def organize_files():
     categorize = get_user_choice("Do you want the files categorized? (Yes/No): ", {"yes", "no", "y", "n"}) in ("yes", "y")
     move = get_user_choice("Do you want the files moved or copied? (Move/Copy): ", {"move", "copy"}) == "move"
     remove_duplicates = get_user_choice("Do you want to remove duplicates? (Yes/No)", {"yes", "no", "y", "n"}) in ("yes", "y")
+    user_threshold = get_threshold() if remove_duplicates else 0
 
     merged_folder.mkdir(exist_ok=True) # Ensure folder exists
 
+    # Show progress bar before the categorization starts
+    total_steps = len(all_files) + 10
+    progress_root, progress, status_label = show_progress_bar(total_steps)
+
     # Find duplicates first and move them
     if remove_duplicates:
-        user_threshold = get_threshold()
+        status_label.config(text="Finding duplicates...")
+        progress.update_idletasks()
+
         duplicates = find_dublicates(all_files, user_threshold) # Get duplicate files
         if duplicates:
             move_files(duplicates, merged_folder / "Duplicates", False, True) # Move duplicates to a separate folder
             all_files = [file for file in all_files if file not in duplicates] # Remove duplicates from processing list
 
+    if categorize:
+        status_label.config(text="Categorizing files...")
+        progress.update_idletasks()
+
     # Categorize files if needed
     files_to_process = categorize_files(all_files) if categorize else all_files
 
+    status_label.config(text="Moving/Copying files...")
+    progress.update_idletasks()
+
     # Move/Copy files
-    move_files(files_to_process, merged_folder, categorize, move)
+    move_files(files_to_process, merged_folder, categorize, move, progress)
 
     messagebox.showinfo("Process Complete", "✅ All files have been organized successfully!")
 
